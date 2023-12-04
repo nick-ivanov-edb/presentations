@@ -1,0 +1,77 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    app: failover-test
+  generateName: pgbench-failover-
+  namespace: default
+spec:
+  backoffLimit: 3
+  completionMode: NonIndexed
+  completions: 1
+  parallelism: 1
+  suspend: false
+  template:
+    metadata:
+      labels: 
+        app: failover-test
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: cnpg.io/instanceRole
+                operator: In
+                values:
+                - primary
+            topologyKey: topology.kubernetes.io/zone
+      containers:
+      - image: ghcr.io/cloudnative-pg/postgresql:15.3
+        imagePullPolicy: IfNotPresent
+        name: pgbench
+        resources: {}
+        args:
+        - /var/lib/postgres/scripts/pgbench-wrapper.sh
+        - "120"
+        - "-n"
+        command:
+        - /bin/bash
+        env:
+        - name: PGHOST
+          value: demo-rw
+        - name: PGDATABASE
+          valueFrom:
+            secretKeyRef:
+              key: dbname
+              name: demo-app
+        - name: PGPORT
+          valueFrom:
+            secretKeyRef:
+              key: port
+              name: demo-app
+        - name: PGUSER
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: demo-app
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: demo-app
+        volumeMounts:
+        - name: client-scripts
+          mountPath: /var/lib/postgres/scripts
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      volumes:
+      - name: client-scripts
+        configMap:
+          name: demo-client-scripts
+      dnsPolicy: ClusterFirst
+      restartPolicy: OnFailure
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 300

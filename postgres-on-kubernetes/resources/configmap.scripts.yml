@@ -1,0 +1,44 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-client-scripts
+data:
+  pgbench-wrapper.sh: |
+    #!/bin/bash
+    # The first parameter is interpreted as the test duration in seconds;
+    # the rest are passed to pgbench verbatim
+    set -x
+    TIME_LEFT=${1:-120}
+    shift 1
+
+    # Check if we have the desired column in pgbench_history
+    RESP=$(psql -t -c "select count(*) from information_schema.columns where table_name = 'pgbench_history' and column_name = 'server_addr'")
+
+    if [[ "$RESP" -eq 0 ]]; then
+      psql -t -c "alter table pgbench_history add column server_addr inet default inet_server_addr()"
+    fi
+
+    # clean up history
+    psql -t -c "truncate table pgbench_history"
+    # ensure the changes are replicated
+    psql -t -c "checkpoint"
+    sleep 5
+
+    while [[ $TIME_LEFT -gt 0 ]]; do
+        START_TIME=$(date +%s)
+        echo "[$(date)] Running up to $TIME_LEFT seconds"
+        pgbench -T $TIME_LEFT $@ 2>/dev/null
+        TIME_ELAPSED=$(($(date +%s) - $START_TIME))
+        TIME_LEFT=$(($TIME_LEFT - $TIME_ELAPSED))
+    done
+    echo "[$(date)] pgbench_wrapper complete"
+
+    psql -c "with t (lag, node_change) as (
+    SELECT 
+      mtime - lag(mtime, 1) OVER w
+      ,server_addr <> lag(server_addr, 1) OVER w
+    FROM pgbench_history
+    WINDOW w AS (ORDER BY mtime)
+    ) SELECT * FROM t WHERE lag > INTERVAL '500 millisecond'"
+---

@@ -1,0 +1,21 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg11
+spec:
+  instances: 1
+  primaryUpdateStrategy: unsupervised
+  storage:
+    size: 1Gi
+  imageName: ghcr.io/cloudnative-pg/postgresql:11
+  bootstrap:
+      initdb:
+         database: nw
+         postInitApplicationSQLRefs:
+            configMapRefs:
+            - name: northwind
+              key: northwind_ddl.sql
+            - name: northwind
+              key: northwind_data.sql
+
+

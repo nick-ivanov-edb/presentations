@@ -1,0 +1,28 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: demo
+spec:
+  instances: 3
+  primaryUpdateStrategy: unsupervised
+  storage:
+    size: 1Gi
+  externalClusters:
+   -  name: pg11
+      connectionParameters:
+         host: pg11-r
+         user: nw
+         dbname: nw
+      password:
+         name: pg11-app
+         key: password
+  bootstrap:
+      initdb:
+         database: nw
+         import:
+            type: microservice
+            databases:
+               - nw
+            source:
+               externalCluster: pg11
+

@@ -1,0 +1,15 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg15
+spec:
+  instances: 3
+  maxSyncReplicas: 1
+  minSyncReplicas: 1
+
+  primaryUpdateStrategy: unsupervised
+
+  # Require 1Gi of space
+  storage:
+    size: 1Gi
+
